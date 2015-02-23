@@ -215,7 +215,8 @@ class Template {
 	 * Gets & Sets a variable
 	 * @param string $key Variable key
 	 * @param mixed $value If false & $force false returns variable ELSE if sets variable if not set or $force = TRUE
-	 * @param bool $force whether to force chaning the variable or not.
+	 * @param bool $force whether to force changing the variable if it exists or not.
+	 * @return string the variable which will be used. (if already exists and force is false the old will be returned)
 	 */
 	public function variable($key, $value = FALSE, $force = FALSE) {
 		$variables = $this->config->item('variables');
@@ -236,6 +237,23 @@ class Template {
 	}
 
 	/**
+	 * Replaces a variable with a rendered block
+	 * @param  string  $key   variable-key-name
+	 * @param  string  $block the block to be rendered
+	 * @param  array   $data  the data submitted to the block
+	 * @param  boolean $force whether to force changing the variable if it exists or not.
+	 */
+	public function variable_block($key, $block, $data = array(), $force = false)
+	{
+		$variables = $this->config->item('variables');
+		if(isset($variables[$key]) && $force != TRUE)
+			return;
+
+		$data = $this->render_block($block, $data, TRUE, TRUE);
+		$this->variable($key, $data, $force);
+	}
+
+	/**
 	 * Disables templating for the site.
 	 * Does not render header, footer etc.
 	 */
@@ -249,9 +267,9 @@ class Template {
 	 * Renders a block
 	 * @param string $block name of the block
 	 * @param array $data the data to pass to the view
-	 * @param bool $force
+	 * @param bool $force Whether rendering the block from the default template or not.
 	 */
-	public function render_block($block, $data = false, $force = true)
+	public function render_block($block, $data = false, $force = true, $return = false)
 	{
 		$template = $this->config->item('template');
 		$view = 'templates/' . $this->config->item('template') . '/_blocks/' . $block;
@@ -261,15 +279,15 @@ class Template {
 			$this->_data = array_merge($this->_data, $data);
 		}
 		$file_exists = file_exists($file);
+
 		if((strlen($template)===0 || !$file_exists) && $force == true && file_exists('views/templates/default/_blocks/' . $block . '.php'))
-		{
-			$this->load->view('templates/default/_blocks/' . $block, $this->_data);
-		}
-		elseif($file_exists)
-		{
-			$this->load->view($view, $this->_data);
-		}
-		return;
+			return $this->load->view('templates/default/_blocks/' . $block, $this->_data, $return);
+		
+		if($file_exists)
+			return $this->load->view($view, $this->_data, $return);
+
+		if($return)
+			return '';
 	}
 
 	/**
