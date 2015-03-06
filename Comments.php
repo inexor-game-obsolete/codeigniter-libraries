@@ -116,32 +116,64 @@ class Comments {
 	 * @param  array   $included_posts includes the id's of all answers which will be loaded.
 	 * @return array            comments (as objects in array)
 	 */
-	public function get_comments($o = array(), $validate = true)
+	public function get_comments($o = array(), $validate = true, &$answers_to = array())
 	{
-		$comments = array();
+		if($validate)
+			$this->_check_comments_options($o);
 
-		$o = $this->_get_options($o, $validate);
+		$defaults = array(
+			"order" => "DESC",
+			"answer-to" => null,
+			"limit" => array(30, 5, 2),
+			"offset" => array(),
+			"include-comment" => false,
+			"answers-to" => false,
+			"answers-to-limit" => 10,
+			"answers-to-offset" => 0,
+			"module" => $this->_module,
+			"identifier" => $this->_identifier
+			);
+		$o = array_merge($defaults, $o);
 
-		if($o['answer-to'])
-			$cm = $this->_CI->comments_model->get_answers($o['answer-to'], $o['order'], array_shift($o['limit']), array_shift($o['offset']));
+		if($o['answers-to'])
+			$answers_to = $this->_CI->comments_model->path_to($answer_to);
+
+		if(!isset($o['offset'][0])) $o['offset'][0] = 0;
+
+		if(isint($o['answer-to']))
+			$comments = $this->_CI->comments_model->get_answers($o['answer-to'], $o['order'], array_shift($o['limit']), array_shift($o['offset']));
 		else
-			$cm = $this->_CI->comments_model->get_comments($o['module'], $o['identifier'], $o['order'], array_shift($o['limit']), array_shift($o['offset']));
+			$comments = $this->_CI->comments_model->get_comments($o['module'], $o['identifier'], $o['order'], array_shift($o['limit']), array_shift($o['offset']));
 
-		$o['order'] = 'ASC';
-		
-		$include_comment = $o['include-comment'];
-		$answers_to      = $o['answers-to'];
-
-		$o['answers-to']      = false;
-		$o['include-comment'] = false;
-
-		foreach($cm as $c)
+		if(count($o['limit']) > 0)
 		{
-			$comments[$c->id] = $this->additional_info($c);
-			if(count($o['limit']) > 0)
+			$check_answers = !(count($answers_to) == 0);
+
+			$c = count($comments);
+			$checkid = false;
+			for($i = 0; $i < $c; $i++)
 			{
-				$o['answer-to'] = $c->id;
-				$comments[$c->id]->answers = $this->get_comments($o, false);
+				$get_answers = $o;
+				$get_answers['answer-to'] = $comments[$i]->id;
+				$get_answers['order'] = 'ASC';
+				$get_answers['answers-to'] = false;
+				if($check_answers && $answers_to[0] == $comments[$i]->id)
+				{
+					array_shift($answers_to);
+					$checkid = $answers_to[0];
+				}
+				$comments[$i]->answers = $this->get_comments($get_answers, false, $answers_to);
+				if($checkid)
+				{
+					if($checkid == $answers_to[0])
+						$this->add_recursive_answers($comments->answers, $answers_to);
+					
+					$checkid = false;
+				}
+				if(count($o['limit']) == 1)
+					$comments[$i]->answers = $this->additional_info($comments[$i]->answers);
+
+				$comments[$i] = $this->additional_info($comments[$i]);
 			}
 
 		}
@@ -208,7 +240,26 @@ class Comments {
 		{
 			$comments[$i] = $this->additional_info($comments[$i]);
 		}
+
 		return $comments;
+	}
+
+
+	/**
+	 * Adds all answers in $path to $array. $path has to be in the correct order (child at the end, parent at the beginning).
+	 * @param array &$array The array to which the answers should be added
+	 * @param array $path   Array containing the path
+	 */
+	public function add_recursive_answers(&$array, $path)
+	{
+		if(empty($path))
+			return;
+	
+		$post = $this->_CI->comments_model->get_by_id(array_shift($path));
+		$post->answers = array();
+		$post = $this->additional_info($post);
+		$this->add_recursive_answers($post->answers, $path);
+		array_push($array[count($array)-1]->answers, $path);
 	}
 
 
@@ -219,6 +270,7 @@ class Comments {
 
 		return $this->_users[$id];
 	}
+
 
 	/**
 	 * Answers to a comment.
