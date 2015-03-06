@@ -78,11 +78,13 @@ class Auth
 	public function login($username, $password, $stay_logged_in = false) {
 		if(strpos($username, "@") !== false) {
 			// checks email, not username
-			if(isint($id = $this->_CI->users_model->check_password($username, $password, true, true))  && $id !== 0) {
+			$id = $this->_CI->users_model->check_password($username, $password, true, true);
+			if(isint($id)  && $id !== 0) {
 				return $this->_login($id, $stay_logged_in);
 			}
 		}
-		if(isint($id = $this->_CI->users_model->check_password($username, $password)) && $id !== 0)
+		$id = $this->_CI->users_model->check_password($username, $password);
+		if(isint($id) && $id !== 0)
 		{
 			return $this->_login($id, $stay_logged_in);
 		}
@@ -187,6 +189,30 @@ class Auth
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Works like $this->user($id) except that secret information will not be included.
+	 * @param  int     $id           id of the user. default: logged in user
+	 * @param  boolean $includeimage wether the image path should be included
+	 * @return object                object of the data
+	 */
+	public function user_info($id = false, $includeimage = false)
+	{
+		$user = (array) $this->user($id);
+		$allowed = array('id', 'username', 'ingame_name', 'about');
+		$return = array();
+		foreach($allowed as $a)
+		{
+			if(isset($user[$a]))
+				$return[$a] = $user[$a];
+		}
+		if($includeimage)
+		{
+			$this->_CI->load->helper('template');
+			$return['avatar'] = avatar_image($return['id']);
+		}
+		return (object) $return;
 	}
 
 	/**
@@ -440,6 +466,7 @@ class Auth
 	private function _validate_name($name, $ingame_name = false, &$error_array = array()) {
 		$error_messages = $this->_CI->config->item('error_messages');
 		$hit_disallowed_characters = array();
+		$error = array();
 		
 		if($ingame_name) { 
 			$dis_c_array = $this->_ingame_disallowed_characters;

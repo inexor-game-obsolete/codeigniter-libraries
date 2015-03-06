@@ -119,7 +119,7 @@ class Template {
 	 * @param string $text The text containing the curly brackets
 	 */
 	public function prevent_variables($text) {
-		return str_replace(array("{", "}"), array("{<", ">}"), $text);
+		return htmlentities($text);
 	}
 
 	/**
@@ -265,9 +265,10 @@ class Template {
 
 	/**
 	 * Renders a block
-	 * @param string $block name of the block
-	 * @param array $data the data to pass to the view
-	 * @param bool $force Whether rendering the block from the default template or not.
+	 * @param string  $block  name of the block
+	 * @param array   $data   the data to pass to the block
+	 * @param boolean $force  Whether force rendering the block from the default template or not.
+	 * @param boolean $return Whether the block should be returned instead of loaded.
 	 */
 	public function render_block($block, $data = false, $force = true, $return = false)
 	{
@@ -406,17 +407,16 @@ class Template {
 		if(strlen($this->variable('title')) < 1)
 			$this->variable('title', $this->config->item('title')['default'], TRUE);
 		$variables = $this->config->item('variables');
-		$output = preg_replace_callback('/{([^\:{<}]*):([^{>}]*)}/', function ($hits) {
+		$output = preg_replace_callback('/<%=([^:%]*):([^%]*)%>/', function ($hits) {
 			$var = $this->variable($hits[1]);
 			if(!empty($var)) return $var;
 			return $hits[2];
 		}, $output);
-		$output = preg_replace_callback('/{([^\{}<>]*)}/', function ($hits) {
+		$output = preg_replace_callback('/<%=([^%]*)%>/', function ($hits) {
 			$var = $this->variable($hits[1]);
 			if(isset($var)) return $var;
 			return '';
 		}, $output);
-		$output = str_replace(array("{<", ">}"), array("{", "}"), $output);
 		return $output;
 	}
 
